@@ -1,5 +1,11 @@
 # PostgresClientKit
 
+The network backend has been re-written as of July 2025, removing Kitura BlueSocket and BlueSSLService dependencies.
+
+WARNINGS:
+This will accept self-signed SSL certificates.
+Authentication tests are not passing since the July 2025 refactor.
+
 <p>
 
   <a href="https://codewinsdotcom.github.io/PostgresClientKit/Docs/API/index.html">

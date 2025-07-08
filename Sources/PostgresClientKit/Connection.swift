@@ -18,8 +18,6 @@
 //
 
 import Foundation
-import Socket
-import SSLService
 
 /// A connection to a Postgres server.
 ///
@@ -89,71 +87,26 @@ public class Connection: CustomStringConvertible {
     public init(configuration: ConnectionConfiguration,
                 delegate: ConnectionDelegate? = nil) throws {
         
-        var success = false
-        
         self.delegate = delegate
         self.socketTimeout = configuration.socketTimeout
         
-        do {
-            socket = try Socket.create()
-            log(.finer, "Created socket")
-        } catch {
-            Postgres.logger.severe("Unable to create socket: \(error)")
-            throw PostgresError.socketError(cause: error)
-        }
-
-        defer {
-            if !success {
-                log(.finer, "Closing socket")
-                socket.close()
-            }
-        }
-        
         let host = configuration.host
         let port = configuration.port
-        let socketTimeout = configuration.socketTimeout
-        let socketTimeoutMillis = UInt((socketTimeout < 0) ? 0 : (1000 * socketTimeout))
+        socket = NetworkConnectionBackend(host: host, port: UInt16(port))
+        log(.finer, "Created socket")
+        
+        let readySemaphore = DispatchSemaphore(value: 0)
 
-        do {
-            log(.fine, "Opening connection to port \(port) on host \(host)")
-            try socket.connect(to: host, port: Int32(port), timeout: socketTimeoutMillis)
-            try socket.setReadTimeout(value: socketTimeoutMillis)
-            try socket.setWriteTimeout(value: socketTimeoutMillis)
-        } catch {
-            log(.severe, "Unable to connect socket: \(error)")
-            throw PostgresError.socketError(cause: error)
+        socket.start {
+            readySemaphore.signal()
+        }
+
+        let timeout: DispatchTime = .now() + .seconds(10)
+        if readySemaphore.wait(timeout: timeout) == .timedOut {
+            // Handle timeout
+            throw PostgresError.timedOutAcquiringConnection
         }
         
-        if configuration.ssl {
-            log(.finer, "Requesting SSL/TLS encryption")
-
-            let sslRequest = SSLRequest()
-            try sendRequest(sslRequest)
-            let sslCode = try readASCIICharacter()
-            
-            guard sslCode == "S" else {
-                log(.severe, "SSL/TLS not enabled on Postgres server")
-                throw PostgresError.sslNotSupported
-            }
-            
-            // The read buffer should be fully consumed at this point, so that the next byte read
-            // will have passed through SSL/TLS decryption.  If this is not the case, there must
-            // either be a server protocol error or a man-in-the-middle attack.
-            try verifyReadBufferFullyConsumed()
-            
-            do {
-                let sslConfig = configuration.sslServiceConfiguration
-                let sslService = try SSLService(usingConfiguration: sslConfig)!
-                socket.delegate = sslService
-                try sslService.initialize(asServer: false)
-                try sslService.onConnect(socket: socket)
-            } catch {
-                log(.severe, "Unable to establish SSL/TLS encryption: \(error)")
-                throw PostgresError.sslError(cause: error)
-            }
-            
-            log(.fine, "Successfully negotiated SSL/TLS encryption")
-        }
         
         let user = configuration.user
         let database = configuration.database
@@ -170,7 +123,7 @@ public class Connection: CustomStringConvertible {
         var authenticationRequestSent = false
         var scramSHA256Authenticator: SCRAMSHA256Authenticator? = nil
         
-        authentication:
+    authentication:
         while true {
             let authenticationResponse = try receiveResponse(type: AuthenticationResponse.self)
             
@@ -272,7 +225,7 @@ public class Connection: CustomStringConvertible {
         }
         
         try receiveResponse(type: ReadyForQueryResponse.self)
-
+        
         if !authenticationRequestSent {
             guard case .trust = configuration.credential else {
                 // Postgres allowed trust authentication, yet a cleartextPassword,
@@ -282,9 +235,8 @@ public class Connection: CustomStringConvertible {
                 throw PostgresError.trustCredentialRequired
             }
         }
-
+        
         log(.fine, "Successfully connected")
-        success = true
     }
     
     /// Uniquely identifies this `Connection`.
@@ -345,7 +297,11 @@ public class Connection: CustomStringConvertible {
     /// concurrently operating against the connection.
     public func closeAbruptly() {
         log(.finer, "Closing socket")
-        socket.close()
+        let closeSemaphore = DispatchSemaphore(value: 0)
+        socket.close {
+            closeSemaphore.signal()
+        }
+        closeSemaphore.wait()
         log(.fine, "Connection closed")
     }
     
@@ -385,7 +341,6 @@ public class Connection: CustomStringConvertible {
         }
     }
     
-
     //
     // MARK: Statement execution
     //
@@ -487,7 +442,7 @@ public class Connection: CustomStringConvertible {
                 // current transaction or upon the next `BindRequest`, whichever comes first.
             }
         )
-            
+        
         let cursor = Cursor(statement: statement, columns: columns)
         
         // Because RowDecoder computes some derived state from the column metadata, we re-use the
@@ -627,7 +582,7 @@ public class Connection: CustomStringConvertible {
         }
     }
     
-
+    
     //
     // MARK: Cursor processing
     //
@@ -699,7 +654,7 @@ public class Connection: CustomStringConvertible {
                         }
                         
                         cursorState = .drained(cursorId: cursorId)
-
+                        
                     case let dataRowResponse as DataRowResponse:
                         row = Row(columns: dataRowResponse.columns,
                                   columnNameRowDecoder: columnNameRowDecoder)
@@ -770,7 +725,7 @@ public class Connection: CustomStringConvertible {
             closeCurrentlyOpenCursor()
         }
     }
-
+    
     /// Closes any currently open `Cursor`.
     private func closeCurrentlyOpenCursor() {
         
@@ -800,7 +755,7 @@ public class Connection: CustomStringConvertible {
         }
     }
     
-
+    
     //
     // MARK: Convenience methods
     //
@@ -885,7 +840,7 @@ public class Connection: CustomStringConvertible {
             case "T": response = try RowDescriptionResponse(responseBody: responseBody)
             case "Z": response = try ReadyForQueryResponse(responseBody: responseBody)
             case "n": response = try NoDataResponse(responseBody: responseBody)
-
+                
             default:
                 log(.warning, "Unrecognized response type: \(responseType)")
                 
@@ -1013,8 +968,8 @@ public class Connection: CustomStringConvertible {
         @discardableResult internal func readUInt16() throws -> UInt16 {
             
             let value = try
-                UInt16(readUInt8()) << 8 +
-                UInt16(readUInt8())
+            UInt16(readUInt8()) << 8 +
+            UInt16(readUInt8())
             
             return value
         }
@@ -1026,14 +981,14 @@ public class Connection: CustomStringConvertible {
         @discardableResult internal func readUInt32() throws -> UInt32 {
             
             let value = try
-                UInt32(readUInt8()) << 24 +
-                UInt32(readUInt8()) << 16 +
-                UInt32(readUInt8()) << 8 +
-                UInt32(readUInt8())
+            UInt32(readUInt8()) << 24 +
+            UInt32(readUInt8()) << 16 +
+            UInt32(readUInt8()) << 8 +
+            UInt32(readUInt8())
             
             return value
         }
-
+        
         /// Reads the specified number of bytes.
         ///
         /// - Parameter count: the number of bytes to read
@@ -1064,7 +1019,7 @@ public class Connection: CustomStringConvertible {
             
             return c
         }
-
+        
         /// Reads a null-terminated UTF8 string.
         ///
         /// - Returns: the string
@@ -1125,11 +1080,11 @@ public class Connection: CustomStringConvertible {
     //
     
     /// The underlying socket to the Postgres server.
-    private let socket: Socket
+    private let socket: NetworkConnectionBackend
     
     /// The timeout for socket operations, in seconds, or 0 for no timeout.
     private let socketTimeout: Int
-
+    
     /// The type of operation most recently performed on the socket.
     ///
     /// Used to detect successive writes.  These should be coalesced into a single write for
@@ -1237,39 +1192,33 @@ public class Connection: CustomStringConvertible {
     }
     
     private func refillReadBuffer() throws {
-        
         assert(readBufferPosition == readBuffer.count)
-        
+
         lastSocketOperation = .read
-        
-        readBuffer.removeAll()
+
+        readBuffer.removeAll(keepingCapacity: true)
         readBufferPosition = 0
-        
-        var readCount = 0
-        
+
         let timeoutInterval = TimeInterval((socketTimeout == 0) ? 30 : socketTimeout)
-        let timeout = Date(timeIntervalSinceNow: timeoutInterval)
-        
-        while readCount == 0 && Date() < timeout && !socket.remoteConnectionClosed {
+        let timeoutDate = Date(timeIntervalSinceNow: timeoutInterval)
+
+        while Date() < timeoutDate && !socket.remoteConnectionClosed {
             do {
-                readCount = try socket.read(into: &readBuffer)
-                
-                if readCount == 0 {
-                    // Workaround https://github.com/Kitura/BlueSSLService/issues/79.
-                    // This issue results in socket.read(...) returning 0 even though the
-                    // socket is supposedly "blocking".
-                    Thread.sleep(forTimeInterval: 0.01) // 10 ms
+                let readCount = try socket.read(into: &readBuffer)
+                if readCount > 0 {
+                    return
+                } else {
+                    // 0 bytes read, wait briefly and try again
+                    Thread.sleep(forTimeInterval: 0.01)
                 }
             } catch {
                 log(.warning, "Error receiving response: \(error)")
                 throw PostgresError.socketError(cause: error)
             }
         }
-        
-        if readCount == 0 {
-            log(.warning, "Response truncated; no data available")
-            throw PostgresError.serverError(description: "no data available from server")
-        }
+
+        log(.warning, "Response truncated; no data available")
+        throw PostgresError.serverError(description: "no data available from server")
     }
     
     /// A buffer of data to be written to Postgres.

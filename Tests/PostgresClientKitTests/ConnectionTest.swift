@@ -29,7 +29,7 @@ class ConnectionTest: PostgresClientKitTestCase {
         var configuration = terryConnectionConfiguration()
         configuration.host = "256.0.0.0"
         XCTAssertThrowsError(try Connection(configuration: configuration)) { error in
-            guard case PostgresError.socketError = error else {
+            guard case PostgresError.timedOutAcquiringConnection = error else {
                 return XCTFail(String(describing: error))
             }
         }

@@ -1,22 +1,21 @@
-// swift-tools-version:5.0
+// swift-tools-version:5.1
 
 import PackageDescription
 
 let package = Package(
     name: "PostgresClientKit",
+    platforms: [
+        .macOS(.v10_14), .iOS(.v12), .tvOS(.v12)
+    ],
     products: [
         .library(
             name: "PostgresClientKit",
             targets: ["PostgresClientKit"]),
     ],
-    dependencies: [
-        .package(url: "https://github.com/Kitura/BlueSocket.git", from: "2.0.0"),
-        .package(url: "https://github.com/Kitura/BlueSSLService", from: "2.0.0")
-    ],
     targets: [
         .target(
-            name: "PostgresClientKit",
-            dependencies: ["Socket", "SSLService"]),
+            name: "PostgresClientKit"
+        ),
         .testTarget(
             name: "PostgresClientKitTests",
             dependencies: ["PostgresClientKit"]),
