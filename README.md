@@ -4,7 +4,6 @@ The network backend has been re-written as of July 2025, removing Kitura BlueSoc
 
 WARNINGS:
 This will accept self-signed SSL certificates.
-Authentication tests are not passing since the July 2025 refactor.
 
 <p>
 
