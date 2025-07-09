@@ -43,9 +43,17 @@ final class NetworkConnectionBackend {
             sec_protocol_options_add_tls_application_protocol(secProtocolOptions, cString)
         }
         
-        // Accept self-signed certs
-        sec_protocol_options_set_verify_block(tlsOptions.securityProtocolOptions, { _, _, verifyComplete in
-            verifyComplete(true)
+        sec_protocol_options_set_verify_block(tlsOptions.securityProtocolOptions, { metadata, trustRef, verifyComplete in
+
+            if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+                verifyComplete(true) // Allow self-signed for localhost
+            } else {
+                // Use default system evaluation for others
+                let trust = sec_trust_copy_ref(trustRef).takeRetainedValue()
+                SecTrustEvaluateAsyncWithError(trust, DispatchQueue.global()) { _, result, _  in
+                    verifyComplete(result)
+                }
+            }
         }, DispatchQueue.global())
         
         

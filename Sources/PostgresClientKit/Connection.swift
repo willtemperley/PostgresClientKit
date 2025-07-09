@@ -1203,10 +1203,6 @@ public class Connection: CustomStringConvertible {
                 let readCount = try socket.read(into: &readBuffer)
                 if readCount > 0 {
                     return
-                } else {
-                    // TODO: this was a hangover from Kitura
-                    // 0 bytes read, wait briefly and try again
-                    Thread.sleep(forTimeInterval: 0.01)
                 }
             } catch {
                 log(.warning, "Error receiving response: \(error)")
