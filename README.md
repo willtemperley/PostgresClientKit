@@ -1,10 +1,5 @@
 # PostgresClientKit
 
-The network backend has been re-written as of July 2025, removing Kitura BlueSocket and BlueSSLService dependencies.
-
-WARNINGS:
-This will accept self-signed SSL certificates.
-
 <p>
 
   <a href="https://codewinsdotcom.github.io/PostgresClientKit/Docs/API/index.html">
@@ -12,7 +7,6 @@ This will accept self-signed SSL certificates.
   </a>
   
   <img src="https://img.shields.io/badge/swift-5-green.svg">
-  <img src="https://img.shields.io/badge/os-linux-green.svg">
   <img src="https://img.shields.io/badge/os-macOS-green.svg">
   <img src="https://img.shields.io/badge/os-iOS-green.svg">  
   
@@ -22,6 +16,8 @@ This will accept self-signed SSL certificates.
 </p>
 
 PostgresClientKit provides a friendly Swift API for operating against a PostgreSQL database.
+
+As of July 2025, the network backend uses Apple’s Network.framework, removing Kitura BlueSocket and BlueSSLService dependencies which are no longer supported. Channel binding support has been enabled, significantly improving security. Non-TLS connection support has been removed.
 
 ## Features
 
@@ -35,7 +31,9 @@ PostgresClientKit provides a friendly Swift API for operating against a PostgreS
 
 - **SSL/TLS support.** Encrypts the connection between PostgresClientKit and the Postgres server.
 
-- **Well-engineered**.  Complete API documentation, an extensive test suite, actively supported.
+- **Channel binding support.** This is essential security feature for SCRAM-SHA-256 authentication over TLS. It links the TLS session to the authentication exchange, protecting against man-in-the-middle (MitM) attacks.
+
+- **Well-engineered**. Complete API documentation, an extensive test suite, actively supported.
 
 Sounds good?  Let's look at an example.
 
@@ -52,6 +50,7 @@ do {
     configuration.database = "example"
     configuration.user = "bob"
     configuration.credential = .scramSHA256(password: "welcome1")
+    configuration.channelBindingPolicy = .required // Enforce channel binding. Defaults to preferred.
 
     let connection = try PostgresClientKit.Connection(configuration: configuration)
     defer { connection.close() }
@@ -88,17 +87,22 @@ San Francisco on 1994-11-27: low: 46, high: 50, precipitation: Optional(0.25)
 San Francisco on 1994-11-29: low: 43, high: 57, precipitation: Optional(0.0)
 ```
 
+## Channel binding
+
+Channel binding is only relevant when using SCRAM-SHA-256 SASL authentication.
+
+The channel binding policy can be configured as either:
+
+* `preferred` - If the server supports SCRAM-SHA-256-PLUS, the client will use channel binding. Otherwise, a warning is logged and the connection falls back to plain SCRAM-SHA-256.
+* `required` - If the server does not support SCRAM-SHA-256-PLUS, an error is thrown and the connection fails.
+⚠️ When using `.preferred` mode, if the connection proceeds with plain SCRAM-SHA-256 (without -PLUS), it's important to verify that the server genuinely does not support SCRAM-SHA-256-PLUS. Otherwise, a protocol downgrade attack may be possible, where an attacker strips the -PLUS mechanism to force weaker authentication.
+
 ## Prerequisites
 
 - **Swift 5 or later**  (PostgresClientKit uses Swift 5 language features)
-- **`libssl-dev`** (only required on Linux)
 
-PostgresClientKit is compatible with Linux, macOS, and iOS.  It has been tested on:
-
-- Ubuntu 18.04 LTS, 20.04 LTS
-- macOS 10.14, 10.15, 11, 12
-- iOS 12, 13, 14, 15
-- Postgres 10, 11, 12, 13, 14
+This fork of PostgresClientKit is compatible with macOS and iOS.
+It has only been tested on Postgres 17.
 
 ## Building
 
@@ -223,8 +227,6 @@ PostgresClientKit uses [Semantic Versioning 2.0.0](https://semver.org).  For the
 
 ## Built with
 
-- [Kitura BlueSocket](https://github.com/Kitura/BlueSocket) - socket library
-- [Kitura BlueSSLService](https://github.com/Kitura/BlueSSLService) - SSL/TLS support
 - [Jazzy](https://github.com/realm/jazzy) - generation of API documentation pages
 
 ## Authors

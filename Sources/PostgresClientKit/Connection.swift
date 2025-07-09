@@ -76,7 +76,7 @@ public class Connection: CustomStringConvertible {
     
     /// The timeout for socket operations, in seconds, or 0 for no timeout.
     private let socketTimeout: Int
-
+    
     var dispatchTimeout: DispatchTime {
         .now() + .seconds(socketTimeout == 0 ? 10 : socketTimeout)
     }
@@ -99,17 +99,34 @@ public class Connection: CustomStringConvertible {
         
         let host = configuration.host
         let port = configuration.port
-        socket = NetworkConnectionBackend(host: host, port: UInt16(port))
+        
+        let certificateHashSemaphore = DispatchSemaphore(value: 0)
+        var certificateHash: Data? = nil
+        socket = NetworkConnectionBackend(host: host, port: UInt16(port)) { data in
+            certificateHash = data
+            certificateHashSemaphore.signal()
+        }
         log(.finer, "Created socket")
         
         let readySemaphore = DispatchSemaphore(value: 0)
-
+        
         socket.start {
             readySemaphore.signal()
         }
-
+        
+        if certificateHashSemaphore.wait(timeout: dispatchTimeout) == .timedOut {
+            log(.warning, "Timed out waiting for certificate hash.")
+            throw PostgresError.timedOutAcquiringConnection
+        }
+        
         if readySemaphore.wait(timeout: dispatchTimeout) == .timedOut {
-            // Handle timeout
+            log(.warning, "Timed out waiting for socket to be ready")
+            throw PostgresError.timedOutAcquiringConnection
+        }
+        
+        // Non-TLS connections are no longer supported.
+        guard let certificateHash else {
+            log(.warning, "Certificate hash was not received.")
             throw PostgresError.timedOutAcquiringConnection
         }
         
@@ -168,7 +185,7 @@ public class Connection: CustomStringConvertible {
                 let passwordMessageRequest = PasswordMessageRequest(password: "md5" + saltedHash)
                 try sendRequest(passwordMessageRequest)
                 authenticationRequestSent = true
-
+                
             case let response as AuthenticationSASLResponse:
                 
                 guard case let .scramSHA256(password) = configuration.credential else {
@@ -188,11 +205,44 @@ public class Connection: CustomStringConvertible {
                         authenticationType: String(describing: response))
                 }
                 
-                scramSHA256Authenticator = SCRAMSHA256Authenticator(user: user, password: password)
+                let channelBinding: SCRAMSHA256Authenticator.ChannelBinding
+                
+                let supportsPlus = response.mechanisms.contains("SCRAM-SHA-256-PLUS")
+                let supportsPlain = response.mechanisms.contains("SCRAM-SHA-256")
+                
+                let mechanism: String
+                
+                switch configuration.channelBindingPolicy {
+                case .required:
+                    guard supportsPlus else {
+                        throw PostgresError.unsupportedAuthenticationType(
+                            authenticationType: String(describing: response))
+                    }
+                    mechanism = "SCRAM-SHA-256-PLUS"
+                    log(.fine, "\(mechanism) supported; Using channel binding.")
+                    channelBinding = .requiredByClient(channelBindingName: "tls-server-end-point", channelBindingData: certificateHash)
+                    
+                case .preferred:
+                    if supportsPlus {
+                        mechanism = "SCRAM-SHA-256-PLUS"
+                        log(.fine, "\(mechanism) supported; Using channel binding.")
+                        channelBinding = .requiredByClient(channelBindingName: "tls-server-end-point", channelBindingData: certificateHash)
+                    } else if supportsPlain {
+                        mechanism = "SCRAM-SHA-256"
+                        log(.warning, "Server does not support SCRAM-SHA-256-PLUS; falling back to \(mechanism). MitM attacks are possible.")
+                        channelBinding = .notSupportedByServer
+                    } else {
+                        throw PostgresError.unsupportedAuthenticationType(
+                            authenticationType: String(describing: response))
+                    }
+                }
+                
+                scramSHA256Authenticator = SCRAMSHA256Authenticator(user: user, password: password, selectedChannelBinding: channelBinding)
+                
                 let clientFirstMessage = try scramSHA256Authenticator!.prepareClientFirstMessage()
                 
                 let saslInitialRequest = SASLInitialRequest(
-                    mechanism: "SCRAM-SHA-256",
+                    mechanism: mechanism,
                     clientFirstMessage: clientFirstMessage)
                 
                 try sendRequest(saslInitialRequest)
@@ -1135,10 +1185,10 @@ public class Connection: CustomStringConvertible {
     private func readUInt32() throws -> UInt32 {
         
         let value = try
-            UInt32(readUInt8()) << 24 +
-            UInt32(readUInt8()) << 16 +
-            UInt32(readUInt8()) << 8 +
-            UInt32(readUInt8())
+        UInt32(readUInt8()) << 24 +
+        UInt32(readUInt8()) << 16 +
+        UInt32(readUInt8()) << 8 +
+        UInt32(readUInt8())
         
         return value
     }
@@ -1189,15 +1239,15 @@ public class Connection: CustomStringConvertible {
     
     private func refillReadBuffer() throws {
         assert(readBufferPosition == readBuffer.count)
-
+        
         lastSocketOperation = .read
-
+        
         readBuffer.removeAll(keepingCapacity: true)
         readBufferPosition = 0
-
+        
         let timeoutInterval = TimeInterval((socketTimeout == 0) ? 30 : socketTimeout)
         let timeoutDate = Date(timeIntervalSinceNow: timeoutInterval)
-
+        
         while Date() < timeoutDate && !socket.remoteConnectionClosed {
             do {
                 let readCount = try socket.read(into: &readBuffer)
@@ -1209,7 +1259,7 @@ public class Connection: CustomStringConvertible {
                 throw PostgresError.socketError(cause: error)
             }
         }
-
+        
         log(.warning, "Response truncated; no data available")
         throw PostgresError.serverError(description: "no data available from server")
     }
@@ -1252,10 +1302,10 @@ public class Connection: CustomStringConvertible {
     //
     
     internal func log(_ level: LogLevel,
-                    _ message: CustomStringConvertible,
-                    file: String = #file,
-                    function: String = #function,
-                    line: Int = #line) {
+                      _ message: CustomStringConvertible,
+                      file: String = #file,
+                      function: String = #function,
+                      line: Int = #line) {
         
         Postgres.logger.log(level: level,
                             message: message,

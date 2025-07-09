@@ -33,7 +33,7 @@ class ConnectionPoolTest: PostgresClientKitTestCase {
             class Delegate: ConnectionDelegate { }
             
             let connectionPoolConfiguration = ConnectionPoolConfiguration()
-            let connectionConfiguration = terryConnectionConfiguration()
+            let connectionConfiguration = terryConnectionConfiguration
             let connectionDelegate = Delegate()
             
             let connectionPool = ConnectionPool(
@@ -422,7 +422,7 @@ class ConnectionPoolTest: PostgresClientKitTestCase {
             let connection: Connection
             
             do {
-                connection = try Connection(configuration: terryConnectionConfiguration())
+                connection = try Connection(configuration: terryConnectionConfiguration)
                 XCTAssertFalse(connection.isClosed)
                 
                 connectionPool.releaseConnection(connection) // should log a warning
@@ -873,7 +873,7 @@ class ConnectionPoolTest: PostgresClientKitTestCase {
         _ operation: (ConnectionPool) -> Void) {
             
             let connectionPoolConfiguration = ConnectionPoolConfiguration()
-            let connectionConfiguration = connectionConfiguration ?? terryConnectionConfiguration()
+            let connectionConfiguration = connectionConfiguration ?? terryConnectionConfiguration
             
             let connectionPool = ConnectionPool(
                 connectionPoolConfiguration: connectionPoolConfiguration,
@@ -1019,7 +1019,6 @@ func connectionConfigurationsEqual(lhs: ConnectionConfiguration,
     
     guard lhs.host == rhs.host &&
             lhs.port == rhs.port &&
-            lhs.ssl == rhs.ssl &&
             lhs.database == rhs.database &&
             lhs.user == rhs.user else {
         return false

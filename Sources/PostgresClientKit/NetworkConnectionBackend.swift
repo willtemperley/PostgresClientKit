@@ -18,6 +18,9 @@
 
 import Network
 import Foundation
+import CryptoKit
+
+typealias ChannelBindingDataProvider = (Data) -> Void
 
 final class NetworkConnectionBackend {
     private let connection: NWConnection
@@ -31,7 +34,9 @@ final class NetworkConnectionBackend {
     
     private var cancelling = false
 
-    init(host: String, port: UInt16) {
+    private var channelBindingDataProvider: ChannelBindingDataProvider?
+    
+    init(host: String, port: UInt16, channelBindingProvider: ChannelBindingDataProvider? = nil) {
         
         let tlsOptions = NWProtocolTLS.Options()
         
@@ -43,19 +48,39 @@ final class NetworkConnectionBackend {
             sec_protocol_options_add_tls_application_protocol(secProtocolOptions, cString)
         }
         
+        func hashSHA256(certificate: SecCertificate) -> Data? {
+            let certData = SecCertificateCopyData(certificate) as Data
+            let digest = SHA256.hash(data: certData)
+            return Data(digest)
+        }
+
         sec_protocol_options_set_verify_block(tlsOptions.securityProtocolOptions, { metadata, trustRef, verifyComplete in
+            let trust = sec_trust_copy_ref(trustRef).takeRetainedValue()
 
             if host == "localhost" || host == "127.0.0.1" || host == "::1" {
-                verifyComplete(true) // Allow self-signed for localhost
+                // Still accept self-signed for localhost
+                if let cert = SecTrustGetCertificateAtIndex(trust, 0) {
+                    let certificateHash = hashSHA256(certificate: cert)
+                    if let channelBindingProvider, let certificateHash {
+                        channelBindingProvider(certificateHash)
+                    }
+                }
+                verifyComplete(true)
             } else {
-                // Use default system evaluation for others
-                let trust = sec_trust_copy_ref(trustRef).takeRetainedValue()
-                SecTrustEvaluateAsyncWithError(trust, DispatchQueue.global()) { _, result, _  in
+                SecTrustEvaluateAsyncWithError(trust, DispatchQueue.global()) { _, result, _ in
+                    if result {
+                        if let cert = SecTrustGetCertificateAtIndex(trust, 0) {
+                            let channelBindingData = hashSHA256(certificate: cert)
+                            if let channelBindingProvider, let channelBindingData {
+                                channelBindingProvider(channelBindingData)
+                            }
+                            print(channelBindingData?.hexEncodedString() ?? "No channel binding data")
+                        }
+                    }
                     verifyComplete(result)
                 }
             }
         }, DispatchQueue.global())
-        
         
         let parameters = NWParameters(tls: tlsOptions)
         self.connection = NWConnection(host: .init(host), port: .init(rawValue: port)!, using: parameters)
@@ -83,6 +108,7 @@ final class NetworkConnectionBackend {
                 self.isReady = false
             }
         }
+        print("init complete")
     }
     
     var remoteConnectionClosed: Bool {

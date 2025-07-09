@@ -26,7 +26,7 @@ class DataTypeTest: PostgresClientKitTestCase {
     func test() {
         
         do {
-            let connection = try Connection(configuration: terryConnectionConfiguration())
+            let connection = try Connection(configuration: terryConnectionConfiguration)
             
             var text = "DROP TABLE IF EXISTS datatypetest"
             try connection.prepareStatement(text: text).execute()

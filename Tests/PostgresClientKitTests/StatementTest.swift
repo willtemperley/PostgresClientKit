@@ -30,14 +30,14 @@ class StatementTest: PostgresClientKitTestCase {
             
             // Success case
             do {
-                let connection = try Connection(configuration: terryConnectionConfiguration())
+                let connection = try Connection(configuration: terryConnectionConfiguration)
                 let text = "SELECT * FROM weather"
                 _ = try connection.prepareStatement(text: text)
             }
             
             // Throws if invalid SQL text
             do {
-                let connection = try Connection(configuration: terryConnectionConfiguration())
+                let connection = try Connection(configuration: terryConnectionConfiguration)
                 let text = "invalid-text"
                 let operation = { try connection.prepareStatement(text: text) }
                 
@@ -50,7 +50,7 @@ class StatementTest: PostgresClientKitTestCase {
             
             // Throws if connection closed
             do {
-                let connection = try Connection(configuration: terryConnectionConfiguration())
+                let connection = try Connection(configuration: terryConnectionConfiguration)
                 connection.close()
                 let text = "SELECT * FROM weather"
                 let operation = { try connection.prepareStatement(text: text) }
@@ -64,7 +64,7 @@ class StatementTest: PostgresClientKitTestCase {
             
             // Closes an open, undrained cursor
             do {
-                let connection = try Connection(configuration: terryConnectionConfiguration())
+                let connection = try Connection(configuration: terryConnectionConfiguration)
                 let text = "SELECT * FROM weather"
                 let statement1 = try connection.prepareStatement(text: text)
                 let cursor1 = try statement1.execute()
@@ -78,7 +78,7 @@ class StatementTest: PostgresClientKitTestCase {
             
             // Closes an open, drained cursor
             do {
-                let connection = try Connection(configuration: terryConnectionConfiguration())
+                let connection = try Connection(configuration: terryConnectionConfiguration)
                 let text = "SELECT * FROM weather"
                 let statement1 = try connection.prepareStatement(text: text)
                 let cursor1 = try statement1.execute()
@@ -100,7 +100,7 @@ class StatementTest: PostgresClientKitTestCase {
         do {
             try createWeatherTable()
             
-            let connection = try Connection(configuration: terryConnectionConfiguration())
+            let connection = try Connection(configuration: terryConnectionConfiguration)
             let text = "SELECT * FROM weather"
             let statement1 = try connection.prepareStatement(text: text)
             let statement2 = try connection.prepareStatement(text: text)
@@ -146,7 +146,7 @@ class StatementTest: PostgresClientKitTestCase {
             
             // Success case without parameters
             do {
-                let connection = try Connection(configuration: terryConnectionConfiguration())
+                let connection = try Connection(configuration: terryConnectionConfiguration)
                 let text = "SELECT * FROM weather"
                 let statement = try connection.prepareStatement(text: text)
                 _ = try statement.execute()
@@ -154,7 +154,7 @@ class StatementTest: PostgresClientKitTestCase {
             
             // Success case with with parameters
             do {
-                let connection = try Connection(configuration: terryConnectionConfiguration())
+                let connection = try Connection(configuration: terryConnectionConfiguration)
                 let text = "SELECT * FROM weather WHERE date = $1"
                 let statement = try connection.prepareStatement(text: text)
                 _ = try statement.execute(parameterValues: [ "1994-12-29" ])
@@ -162,7 +162,7 @@ class StatementTest: PostgresClientKitTestCase {
             
             // Throws if parameters invalid
             do {
-                let connection = try Connection(configuration: terryConnectionConfiguration())
+                let connection = try Connection(configuration: terryConnectionConfiguration)
                 let text = "SELECT * FROM weather WHERE date = $1"
                 let statement = try connection.prepareStatement(text: text)
                 let operation = { try statement.execute(parameterValues: [ "invalid-date" ]) }
@@ -175,7 +175,7 @@ class StatementTest: PostgresClientKitTestCase {
             
             // Throws if connection closed
             do {
-                let connection = try Connection(configuration: terryConnectionConfiguration())
+                let connection = try Connection(configuration: terryConnectionConfiguration)
                 let text = "SELECT * FROM weather"
                 let statement = try connection.prepareStatement(text: text)
                 connection.close()
@@ -190,7 +190,7 @@ class StatementTest: PostgresClientKitTestCase {
             
             // Throws if statement closed
             do {
-                let connection = try Connection(configuration: terryConnectionConfiguration())
+                let connection = try Connection(configuration: terryConnectionConfiguration)
                 let text = "SELECT * FROM weather"
                 let statement = try connection.prepareStatement(text: text)
                 statement.close()
@@ -205,7 +205,7 @@ class StatementTest: PostgresClientKitTestCase {
             
             // Closes an open, undrained cursor
             do {
-                let connection = try Connection(configuration: terryConnectionConfiguration())
+                let connection = try Connection(configuration: terryConnectionConfiguration)
                 let text = "SELECT * FROM weather"
                 let statement1 = try connection.prepareStatement(text: text)
                 let statement2 = try connection.prepareStatement(text: text)
@@ -222,7 +222,7 @@ class StatementTest: PostgresClientKitTestCase {
             
             // Closes an open, drained cursor
             do {
-                let connection = try Connection(configuration: terryConnectionConfiguration())
+                let connection = try Connection(configuration: terryConnectionConfiguration)
                 let text = "SELECT * FROM weather"
                 let statement1 = try connection.prepareStatement(text: text)
                 let statement2 = try connection.prepareStatement(text: text)
@@ -241,7 +241,7 @@ class StatementTest: PostgresClientKitTestCase {
             
             // Repeated execution of same statement
             do {
-                let connection = try Connection(configuration: terryConnectionConfiguration())
+                let connection = try Connection(configuration: terryConnectionConfiguration)
                 let text = "SELECT COUNT(*) FROM weather WHERE date = $1"
                 let statement = try connection.prepareStatement(text: text)
                 

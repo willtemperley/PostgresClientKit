@@ -34,7 +34,7 @@ class SQLStatementTest: PostgresClientKitTestCase {
         
         do {
             try createWeatherTable()
-            let connection = try Connection(configuration: terryConnectionConfiguration())
+            let connection = try Connection(configuration: terryConnectionConfiguration)
 
             // Create 1000 days of random weather records for San Jose.
             var weatherHistory = [[PostgresValueConvertible]]()
@@ -194,7 +194,7 @@ class SQLStatementTest: PostgresClientKitTestCase {
         
         do {
             try createWeatherTable()
-            let connection = try Connection(configuration: terryConnectionConfiguration())
+            let connection = try Connection(configuration: terryConnectionConfiguration)
             
             var text = "DECLARE wc CURSOR WITH HOLD FOR SELECT * FROM weather"
             var statement = try connection.prepareStatement(text: text)
@@ -232,7 +232,7 @@ class SQLStatementTest: PostgresClientKitTestCase {
         
         do {
             try createWeatherTable()
-            let connection = try Connection(configuration: terryConnectionConfiguration())
+            let connection = try Connection(configuration: terryConnectionConfiguration)
             
             func checkResultMetadata(columns: [ColumnMetadata]) {
                 

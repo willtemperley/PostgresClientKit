@@ -28,7 +28,7 @@ internal class SCRAMSHA256Authenticator {
     ///   - user: the Postgres username
     ///   - password: the password for that user
     ///   - cnonce: the nonce, or nil to generate a random nonce
-    internal init(user: String, password: String, cnonce: String? = nil) {
+    internal init(user: String, password: String, cnonce: String? = nil, selectedChannelBinding: ChannelBinding = .notSupportedByClient) {
         
         self.user = user
         self.password = password
@@ -38,8 +38,7 @@ internal class SCRAMSHA256Authenticator {
         self.cnonce = cnonce ??
             Data((0..<18).map { _ in UInt8.random(in: UInt8.min...UInt8.max) }).base64EncodedString()
         
-        // We don't currently support channel binding.
-        selectedChannelBinding = .notSupportedByClient
+        self.selectedChannelBinding = selectedChannelBinding
     }
     
     /// Prepares the `client-first-message`.

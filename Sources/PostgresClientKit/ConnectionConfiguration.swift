@@ -29,9 +29,6 @@ public struct ConnectionConfiguration {
     /// The port number of the Postgres server.  Defaults to `5432`.
     public var port = 5432
     
-    /// Whether to use SSL/TLS to connect to the Postgres server.  Defaults to `true`.
-    public var ssl = true
-    
     /// The timeout for socket operations, in seconds, or 0 for no timeout.  Defaults to 0.
     public var socketTimeout = 0
     
@@ -48,6 +45,9 @@ public struct ConnectionConfiguration {
     /// The Postgres `application_name` parameter.  Included in the `pg_stat_activity` view and
     /// displayed by pgAdmin.  Defaults to `PostgresClientKit`.
     public var applicationName = "PostgresClientKit"
+    
+    /// The channel binding policy
+    public var channelBindingPolicy: ChannelBindingPolicy = .preferred
 }
 
 // EOF

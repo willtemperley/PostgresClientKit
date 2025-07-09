@@ -80,38 +80,31 @@ class PostgresClientKitTestCase: XCTestCase {
     // MARK: Connections
     //
         
-    /// Creates a `ConnectionConfiguration` for Terry, authenticating by `Credential.trust`.
-    ///
-    /// - Parameter ssl: whether to use SSL/TLS
-    /// - Returns: the configuration
-    func terryConnectionConfiguration(ssl: Bool = true) -> ConnectionConfiguration {
+    /// A `ConnectionConfiguration` for Terry, authenticating by `Credential.trust`.
+    var terryConnectionConfiguration: ConnectionConfiguration {
         
         let environment = TestEnvironment.current
         
         var configuration = ConnectionConfiguration()
         configuration.host = environment.postgresHost
         configuration.port = environment.postgresPort
-        configuration.ssl = ssl
         configuration.database = environment.postgresDatabase
         configuration.user = environment.terryUsername
         configuration.credential = .trust
+        configuration.channelBindingPolicy = .required
         
         return configuration
     }
     
-    /// Creates a `ConnectionConfiguration` for Charlie, authenticating by
+    /// A `ConnectionConfiguration` for Charlie, authenticating by
     /// `Credential.cleartextPassword`.
-    ///
-    /// - Parameter ssl: whether to use SSL/TLS
-    /// - Returns: the configuration
-    func charlieConnectionConfiguration(ssl: Bool = true) -> ConnectionConfiguration {
+    var charlieConnectionConfiguration:  ConnectionConfiguration {
         
         let environment = TestEnvironment.current
         
         var configuration = ConnectionConfiguration()
         configuration.host = environment.postgresHost
         configuration.port = environment.postgresPort
-        configuration.ssl = ssl
         configuration.database = environment.postgresDatabase
         configuration.user = environment.charlieUsername
         configuration.credential = .cleartextPassword(password: environment.charliePassword)
@@ -119,18 +112,14 @@ class PostgresClientKitTestCase: XCTestCase {
         return configuration
     }
     
-    /// Creates a `ConnectionConfiguration` for Mary, authenticating by `Credential.md5Password`.
-    ///
-    /// - Parameter ssl: whether to use SSL/TLS
-    /// - Returns: the configuration
-    func maryConnectionConfiguration(ssl: Bool = true) -> ConnectionConfiguration {
+    /// A `ConnectionConfiguration` for Mary, authenticating by `Credential.md5Password`.
+    var maryConnectionConfiguration: ConnectionConfiguration {
         
         let environment = TestEnvironment.current
         
         var configuration = ConnectionConfiguration()
         configuration.host = environment.postgresHost
         configuration.port = environment.postgresPort
-        configuration.ssl = ssl
         configuration.database = environment.postgresDatabase
         configuration.user = environment.maryUsername
         configuration.credential = .md5Password(password: environment.maryPassword)
@@ -138,10 +127,7 @@ class PostgresClientKitTestCase: XCTestCase {
         return configuration
     }
     
-    /// Creates a `ConnectionConfiguration` for Sally, authenticating by `Credential.scramSHA256`.
-    ///
-    /// - Parameter ssl: whether to use SSL/TLS
-    /// - Returns: the configuration
+    /// A `ConnectionConfiguration` for Sally, authenticating by `Credential.scramSHA256`.
     func sallyConnectionConfiguration(ssl: Bool = true) -> ConnectionConfiguration {
         
         let environment = TestEnvironment.current
@@ -149,7 +135,6 @@ class PostgresClientKitTestCase: XCTestCase {
         var configuration = ConnectionConfiguration()
         configuration.host = environment.postgresHost
         configuration.port = environment.postgresPort
-        configuration.ssl = ssl
         configuration.database = environment.postgresDatabase
         configuration.user = environment.sallyUsername
         configuration.credential = .scramSHA256(password: environment.sallyPassword)
@@ -169,7 +154,7 @@ class PostgresClientKitTestCase: XCTestCase {
     /// - SeeAlso: https://www.postgresql.org/docs/12/tutorial-populate.html
     func createWeatherTable() throws {
         
-        let configuration = terryConnectionConfiguration()
+        let configuration = terryConnectionConfiguration
         let connection = try Connection(configuration: configuration)
         defer { connection.close() }
         

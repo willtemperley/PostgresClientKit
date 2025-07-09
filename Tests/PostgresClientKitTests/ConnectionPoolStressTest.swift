@@ -48,7 +48,7 @@ class ConnectionPoolStressTest: PostgresClientKitTestCase {
         
         let pool = ConnectionPool(
             connectionPoolConfiguration: connectionPoolConfiguration,
-            connectionConfiguration: terryConnectionConfiguration())
+            connectionConfiguration: terryConnectionConfiguration)
         
         for _ in 0..<requestCount {
             

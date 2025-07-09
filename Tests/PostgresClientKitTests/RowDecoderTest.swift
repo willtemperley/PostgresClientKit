@@ -415,7 +415,7 @@ class RowDecoderTest: PostgresClientKitTestCase {
     func testPerformance() {
         do {
             // INSERT 1000 days of random weather records for San Jose.
-            let connection = try Connection(configuration: terryConnectionConfiguration())
+            let connection = try Connection(configuration: terryConnectionConfiguration)
             try connection.beginTransaction()
             let text = "INSERT INTO weather (date, city, temp_lo, temp_hi, prcp) VALUES ($1, $2, $3, $4, $5)"
             let statement = try connection.prepareStatement(text: text)
@@ -483,7 +483,7 @@ class RowDecoderTest: PostgresClientKitTestCase {
                                type: T.Type,
                                retrieveColumnMetadata: Bool = true,
                                defaultTimeZone: TimeZone? = nil) throws -> [T] where T: Decodable {
-        let connection = try Connection(configuration: terryConnectionConfiguration())
+        let connection = try Connection(configuration: terryConnectionConfiguration)
         let statement = try connection.prepareStatement(text: sql)
         let cursor = try statement.execute(retrieveColumnMetadata: retrieveColumnMetadata)
         var results = [T]()
@@ -499,7 +499,7 @@ class RowDecoderTest: PostgresClientKitTestCase {
                                 type: T.Type,
                                 defaultTimeZone: TimeZone? = nil) throws -> [T] where T: Decodable {
         
-        let connection = try Connection(configuration: terryConnectionConfiguration())
+        let connection = try Connection(configuration: terryConnectionConfiguration)
         let statement = try connection.prepareStatement(text: sql)
         let cursor = try statement.execute(retrieveColumnMetadata: false)
         var results = [T]()

@@ -59,7 +59,7 @@ class ConnectionDelegateTest: PostgresClientKitTestCase {
         
         do {
             let delegate = Delegate()
-            let configuration = terryConnectionConfiguration()
+            let configuration = terryConnectionConfiguration
             let connection = try Connection(configuration: configuration, delegate: delegate)
             
             // didReceiveNotice

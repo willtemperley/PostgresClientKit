@@ -27,7 +27,7 @@ class CursorTest: PostgresClientKitTestCase {
         do {
             try createWeatherTable()
             
-            let connection = try Connection(configuration: terryConnectionConfiguration())
+            let connection = try Connection(configuration: terryConnectionConfiguration)
             let text = "SELECT * FROM weather"
             let statement = try connection.prepareStatement(text: text)
             
