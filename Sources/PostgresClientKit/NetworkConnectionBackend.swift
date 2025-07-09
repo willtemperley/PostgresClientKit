@@ -28,6 +28,8 @@ final class NetworkConnectionBackend {
     
     private var onReadyCallbacks: [() -> Void] = []
     private var onCancelCallbacks: [() -> Void] = []
+    
+    private var cancelling = false
 
     init(host: String, port: UInt16) {
         
@@ -55,6 +57,7 @@ final class NetworkConnectionBackend {
             
             switch state {
             case .ready:
+                cancelling = false
                 self.isReady = true
                 let callbacks = self.onReadyCallbacks
                 self.onReadyCallbacks = [] // Clear queue
@@ -83,13 +86,16 @@ final class NetworkConnectionBackend {
         connection.start(queue: .global())
     }
     
-    func close(callback: @escaping () -> Void) {
-        onCancelCallbacks.append(callback)
-        connection.cancel()
-    }
-    
-    func forceCancel() {
-        connection.forceCancel()
+    func cancel(force: Bool = false, callback: (() -> Void)? = nil) {
+        cancelling = true
+        if let callback {
+            onCancelCallbacks.append(callback)
+        }
+        if force {
+            connection.forceCancel()
+        } else {
+            connection.cancel()
+        }
     }
 
     func read(into buffer: inout Data) throws -> Int {
@@ -150,6 +156,9 @@ final class NetworkConnectionBackend {
     }
     
     var isConnected: Bool {
+        if cancelling {
+            return false
+        }
         switch connection.state {
         case .ready:
             return true

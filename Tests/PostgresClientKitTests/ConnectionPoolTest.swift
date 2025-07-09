@@ -41,10 +41,10 @@ class ConnectionPoolTest: PostgresClientKitTestCase {
                 connectionConfiguration: connectionConfiguration,
                 connectionDelegate: connectionDelegate)
             
-            XCTAssertEqual(connectionPool.connectionPoolConfiguration, connectionPoolConfiguration)
-            XCTAssertEqual(connectionPool.connectionConfiguration, connectionConfiguration)
+            XCTAssertTrue(connectionPoolsEqual(lhs: connectionPoolConfiguration, rhs: connectionPoolConfiguration))
+            XCTAssertTrue(connectionConfigurationsEqual(lhs: connectionConfiguration, rhs: connectionConfiguration))
             XCTAssertTrue(connectionPool.connectionDelegate === connectionDelegate)
-
+            
             connectionPool.checkMetrics(successfulRequests: 0,
                                         unsuccessfulRequestsTooBusy: 0,
                                         unsuccessfulRequestsTimedOut: 0,
@@ -141,18 +141,18 @@ class ConnectionPoolTest: PostgresClientKitTestCase {
                                         allocatedConnectionsClosedByRequestor: 0,
                                         allocatedConnectionsTimedOut: 0)
         }
-
-
+        
+        
         //
         // acquireConnection: connection pool closed
         //
-
+        
         withConnectionPool { connectionPool in
             
             connectionPool.close()
             
             let expectation = expect("acquireConnection: connection pool closed")
-
+            
             connectionPool.acquireConnection { result in
                 guard case .failure(PostgresError.connectionPoolClosed) = result else {
                     return XCTFail("\(result)")
@@ -160,7 +160,7 @@ class ConnectionPoolTest: PostgresClientKitTestCase {
                 
                 expectation.fulfill()
             }
-
+            
             waitForExpectations()
             
             connectionPool.checkMetrics(successfulRequests: 0,
@@ -398,7 +398,7 @@ class ConnectionPoolTest: PostgresClientKitTestCase {
             connectionPool.releaseConnection(connection)
             Thread.sleep(forTimeInterval: 0.1) // let any async socket close complete
             XCTAssertFalse(connection.isClosed)
-
+            
             connectionPool.checkMetrics(successfulRequests: 1,
                                         unsuccessfulRequestsTooBusy: 0,
                                         unsuccessfulRequestsTimedOut: 0,
@@ -420,7 +420,7 @@ class ConnectionPoolTest: PostgresClientKitTestCase {
         withConnectionPool { connectionPool in
             
             let connection: Connection
-                
+            
             do {
                 connection = try Connection(configuration: terryConnectionConfiguration())
                 XCTAssertFalse(connection.isClosed)
@@ -444,7 +444,7 @@ class ConnectionPoolTest: PostgresClientKitTestCase {
                                         allocatedConnectionsClosedByRequestor: 0,
                                         allocatedConnectionsTimedOut: 0)
         }
-
+        
         
         //
         // releaseConnection: pool non-forcibly closed
@@ -462,7 +462,7 @@ class ConnectionPoolTest: PostgresClientKitTestCase {
             connectionPool.releaseConnection(connection)
             Thread.sleep(forTimeInterval: 0.1) // let any async socket close complete
             XCTAssertTrue(connection.isClosed)
-
+            
             connectionPool.checkMetrics(successfulRequests: 1,
                                         unsuccessfulRequestsTooBusy: 0,
                                         unsuccessfulRequestsTimedOut: 0,
@@ -493,7 +493,7 @@ class ConnectionPoolTest: PostgresClientKitTestCase {
             connectionPool.releaseConnection(connection)
             Thread.sleep(forTimeInterval: 0.1) // let any async socket close complete
             XCTAssertTrue(connection.isClosed)
-
+            
             connectionPool.checkMetrics(successfulRequests: 1,
                                         unsuccessfulRequestsTooBusy: 0,
                                         unsuccessfulRequestsTimedOut: 0,
@@ -518,10 +518,10 @@ class ConnectionPoolTest: PostgresClientKitTestCase {
             
             let connection = acquireConnections(connectionPool: connectionPool, count: 1).first!
             XCTAssertFalse(connection.isClosed)
-
+            
             Thread.sleep(forTimeInterval: 1.1)
             XCTAssertTrue(connection.isClosed)
-
+            
             connectionPool.releaseConnection(connection)
             Thread.sleep(forTimeInterval: 0.1) // let any async socket close complete
             XCTAssertTrue(connection.isClosed)
@@ -552,7 +552,7 @@ class ConnectionPoolTest: PostgresClientKitTestCase {
             connectionPool.releaseConnection(connection)
             Thread.sleep(forTimeInterval: 0.1) // let any async socket close complete
             XCTAssertFalse(connection.isClosed)
-
+            
             connectionPool.releaseConnection(connection) // should log a warning
             Thread.sleep(forTimeInterval: 0.1) // let any async socket close complete
             XCTAssertTrue(connection.isClosed)
@@ -582,7 +582,7 @@ class ConnectionPoolTest: PostgresClientKitTestCase {
             
             connection.close()
             XCTAssertTrue(connection.isClosed)
-
+            
             connectionPool.releaseConnection(connection)
             Thread.sleep(forTimeInterval: 0.1) // let any async socket close complete
             XCTAssertTrue(connection.isClosed)
@@ -599,8 +599,8 @@ class ConnectionPoolTest: PostgresClientKitTestCase {
                                         allocatedConnectionsClosedByRequestor: 1,
                                         allocatedConnectionsTimedOut: 0)
         }
-
-
+        
+        
         //
         // releaseConnection: explicit transaction was committed
         //
@@ -737,7 +737,7 @@ class ConnectionPoolTest: PostgresClientKitTestCase {
                                         allocatedConnectionsClosedByRequestor: 0,
                                         allocatedConnectionsTimedOut: 0)
         }
-
+        
         //
         // withConnection: failure
         //
@@ -789,7 +789,7 @@ class ConnectionPoolTest: PostgresClientKitTestCase {
             XCTAssertTrue(connectionPool.isClosed)
             connectionPool.close(force: true) // should have no effect
             XCTAssertTrue(connectionPool.isClosed)
-
+            
             connectionPool.checkMetrics(successfulRequests: 5,
                                         unsuccessfulRequestsTooBusy: 0,
                                         unsuccessfulRequestsTimedOut: 0,
@@ -839,7 +839,7 @@ class ConnectionPoolTest: PostgresClientKitTestCase {
             XCTAssertTrue(connectionPool.isClosed)
             connectionPool.close(force: true) // should have no effect
             XCTAssertTrue(connectionPool.isClosed)
-
+            
             connectionPool.checkMetrics(successfulRequests: 5,
                                         unsuccessfulRequestsTooBusy: 0,
                                         unsuccessfulRequestsTimedOut: 0,
@@ -871,18 +871,18 @@ class ConnectionPoolTest: PostgresClientKitTestCase {
     func withConnectionPool(
         connectionConfiguration: ConnectionConfiguration? = nil,
         _ operation: (ConnectionPool) -> Void) {
-        
-        let connectionPoolConfiguration = ConnectionPoolConfiguration()
-        let connectionConfiguration = connectionConfiguration ?? terryConnectionConfiguration()
-        
-        let connectionPool = ConnectionPool(
-            connectionPoolConfiguration: connectionPoolConfiguration,
-            connectionConfiguration: connectionConfiguration)
-        
-        operation(connectionPool)
-        
-        connectionPool.close(force: true)
-    }
+            
+            let connectionPoolConfiguration = ConnectionPoolConfiguration()
+            let connectionConfiguration = connectionConfiguration ?? terryConnectionConfiguration()
+            
+            let connectionPool = ConnectionPool(
+                connectionPoolConfiguration: connectionPoolConfiguration,
+                connectionConfiguration: connectionConfiguration)
+            
+            operation(connectionPool)
+            
+            connectionPool.close(force: true)
+        }
     
     /// Acquires and returns the specified number of connections.
     ///
@@ -934,7 +934,7 @@ class ConnectionPoolTest: PostgresClientKitTestCase {
         }
     }
 }
-        
+
 fileprivate extension ConnectionPool {
     
     
@@ -969,7 +969,7 @@ fileprivate extension ConnectionPool {
         XCTAssertEqual(metrics.unsuccessfulRequestsError,
                        unsuccessfulRequestsError,
                        "unsuccessfulRequestsError", file: file, line: line)
-
+        
         XCTAssertEqual(metrics.minimumPendingRequests,
                        minimumPendingRequests,
                        "maximumPendingRequests", file: file, line: line)
@@ -1000,48 +1000,44 @@ fileprivate extension ConnectionPool {
     }
 }
 
-extension ConnectionPoolConfiguration: Equatable {
+
+func connectionPoolsEqual(lhs: ConnectionPoolConfiguration,
+                          rhs: ConnectionPoolConfiguration) -> Bool {
     
-    public static func == (lhs: ConnectionPoolConfiguration,
-                           rhs: ConnectionPoolConfiguration) -> Bool {
-        
-        return lhs.maximumConnections == rhs.maximumConnections &&
-            lhs.maximumPendingRequests == rhs.maximumPendingRequests &&
-            lhs.pendingRequestTimeout == rhs.pendingRequestTimeout &&
-            lhs.allocatedConnectionTimeout == rhs.allocatedConnectionTimeout &&
-            lhs.dispatchQueue === rhs.dispatchQueue &&
-            lhs.metricsLoggingInterval == rhs.metricsLoggingInterval &&
-            lhs.metricsResetWhenLogged == rhs.metricsResetWhenLogged
-    }
+    return lhs.maximumConnections == rhs.maximumConnections &&
+    lhs.maximumPendingRequests == rhs.maximumPendingRequests &&
+    lhs.pendingRequestTimeout == rhs.pendingRequestTimeout &&
+    lhs.allocatedConnectionTimeout == rhs.allocatedConnectionTimeout &&
+    lhs.dispatchQueue === rhs.dispatchQueue &&
+    lhs.metricsLoggingInterval == rhs.metricsLoggingInterval &&
+    lhs.metricsResetWhenLogged == rhs.metricsResetWhenLogged
 }
 
-extension ConnectionConfiguration: Equatable {
+
+func connectionConfigurationsEqual(lhs: ConnectionConfiguration,
+                                   rhs: ConnectionConfiguration) -> Bool {
     
-    public static func == (lhs: ConnectionConfiguration,
-                           rhs: ConnectionConfiguration) -> Bool {
-        
-        guard lhs.host == rhs.host &&
+    guard lhs.host == rhs.host &&
             lhs.port == rhs.port &&
             lhs.ssl == rhs.ssl &&
             lhs.database == rhs.database &&
             lhs.user == rhs.user else {
-                return false
-        }
+        return false
+    }
+    
+    switch (lhs.credential, rhs.credential) {
+    case (.trust, .trust):
+        return true
         
-        switch (lhs.credential, rhs.credential) {
-        case (.trust, .trust):
-            return true
-            
-        case let (.cleartextPassword(password: s1),
-                  .cleartextPassword(password: s2)) where s1 == s2:
-            return true
-            
-        case let (.md5Password(password: s1),
-                  .md5Password(password: s2)) where s1 == s2:
-            return true
-            
-        default: return false
-        }
+    case let (.cleartextPassword(password: s1),
+              .cleartextPassword(password: s2)) where s1 == s2:
+        return true
+        
+    case let (.md5Password(password: s1),
+              .md5Password(password: s2)) where s1 == s2:
+        return true
+        
+    default: return false
     }
 }
 

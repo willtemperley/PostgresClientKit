@@ -28,6 +28,7 @@ class ConnectionTest: PostgresClientKitTestCase {
         // Network error
         var configuration = terryConnectionConfiguration()
         configuration.host = "256.0.0.0"
+        configuration.socketTimeout = 1
         XCTAssertThrowsError(try Connection(configuration: configuration)) { error in
             guard case PostgresError.timedOutAcquiringConnection = error else {
                 return XCTFail(String(describing: error))
@@ -239,27 +240,39 @@ class ConnectionTest: PostgresClientKitTestCase {
             XCTAssertFalse(connection2.isClosed)
             
             // Connections can be independently closed
-            connection1.close()
-            XCTAssertTrue(connection1.isClosed)
+            let expectation1 = expectation(description: "Connection 1 should be closed.")
+            connection1.close {
+                XCTAssertTrue(connection1.isClosed)
+                expectation1.fulfill()
+            }
             XCTAssertFalse(connection2.isClosed)
             
             // close() is idempotent
-            connection1.close()
+            connection1.close { }
             XCTAssertTrue(connection1.isClosed)
             XCTAssertFalse(connection2.isClosed)
             
-            connection2.close()
-            XCTAssertTrue(connection1.isClosed)
-            XCTAssertTrue(connection2.isClosed)
+            let expectation2 = expectation(description: "Connection 2 should be closed.")
+            connection2.close {
+                XCTAssertTrue(connection2.isClosed)
+                expectation2.fulfill()
+            }
             
             // closeAbruptly() forces the connection to close.
+            let expectation3 = expectation(description: "Connection 3 should be closed.")
             let connection3 = try Connection(configuration: configuration)
+            connection3.closeAbruptly {
+                XCTAssertTrue(connection3.isClosed)
+                expectation3.fulfill()
+            }
             connection3.closeAbruptly()
-            XCTAssertTrue(connection3.isClosed)
-            connection3.closeAbruptly()
-            XCTAssertTrue(connection3.isClosed)
             connection3.close()
-            XCTAssertTrue(connection3.isClosed)
+            
+            waitForExpectations(timeout: 1) { error in
+              if let error = error {
+                XCTFail("waitForExpectationsWithTimeout errored: \(error)")
+              }
+            }
         } catch {
             XCTFail(String(describing: error))
         }

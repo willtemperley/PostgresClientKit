@@ -74,6 +74,13 @@ import Foundation
 /// the network socket).  Use `Connection.isClosed` to test whether a `Connection` is closed.
 public class Connection: CustomStringConvertible {
     
+    /// The timeout for socket operations, in seconds, or 0 for no timeout.
+    private let socketTimeout: Int
+
+    var dispatchTimeout: DispatchTime {
+        .now() + .seconds(socketTimeout == 0 ? 10 : socketTimeout)
+    }
+    
     //
     // MARK: Connection lifecycle
     //
@@ -101,12 +108,10 @@ public class Connection: CustomStringConvertible {
             readySemaphore.signal()
         }
 
-        let timeout: DispatchTime = .now() + .seconds(10)
-        if readySemaphore.wait(timeout: timeout) == .timedOut {
+        if readySemaphore.wait(timeout: dispatchTimeout) == .timedOut {
             // Handle timeout
             throw PostgresError.timedOutAcquiringConnection
         }
-        
         
         let user = configuration.user
         let database = configuration.database
@@ -276,15 +281,13 @@ public class Connection: CustomStringConvertible {
     /// Closes this `Connection`.
     ///
     /// Has no effect if this `Connection` is already closed.
-    public func close() {
+    public func close(callback: (() -> Void)? = nil) {
         if !isClosed {
             log(.fine, "Closing connection")
             cursorState = .closed
-            
             let terminateRequest = TerminateRequest()
             try? sendRequest(terminateRequest) // consumes any Error
-            
-            closeAbruptly()
+            socket.cancel(callback: callback)
         }
     }
     
@@ -295,13 +298,9 @@ public class Connection: CustomStringConvertible {
     ///
     /// Use this method to force a connection to immediately close, even if another thread is
     /// concurrently operating against the connection.
-    public func closeAbruptly() {
+    public func closeAbruptly(callback: (() -> Void)? = nil) {
         log(.finer, "Closing socket")
-        let closeSemaphore = DispatchSemaphore(value: 0)
-        socket.close {
-            closeSemaphore.signal()
-        }
-        closeSemaphore.wait()
+        socket.cancel(force: true, callback: callback)
         log(.fine, "Connection closed")
     }
     
@@ -1082,9 +1081,6 @@ public class Connection: CustomStringConvertible {
     /// The underlying socket to the Postgres server.
     private let socket: NetworkConnectionBackend
     
-    /// The timeout for socket operations, in seconds, or 0 for no timeout.
-    private let socketTimeout: Int
-    
     /// The type of operation most recently performed on the socket.
     ///
     /// Used to detect successive writes.  These should be coalesced into a single write for
@@ -1208,6 +1204,7 @@ public class Connection: CustomStringConvertible {
                 if readCount > 0 {
                     return
                 } else {
+                    // TODO: this was a hangover from Kitura
                     // 0 bytes read, wait briefly and try again
                     Thread.sleep(forTimeInterval: 0.01)
                 }
