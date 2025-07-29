@@ -1,5 +1,9 @@
 # PostgresClientKit
 
+### This project has archived
+It has been re-written with a fully asnchronous API:
+https://github.com/willtemperley/swift-postgres-client
+
 <p>
 
   <a href="https://codewinsdotcom.github.io/PostgresClientKit/Docs/API/index.html">
