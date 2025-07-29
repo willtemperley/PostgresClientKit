@@ -1,8 +1,11 @@
 # PostgresClientKit
 
-### This project has archived
-It has been re-written with a fully asnchronous API:
+### This project has been archived and rewritten as SwiftPostgresClient.
+Given most of the public APIs have been changed and it is now fully asynchronous, it seems reasonable to rename it to avoid confusion.
+
 https://github.com/willtemperley/swift-postgres-client
+
+<br/>
 
 <p>
 
